@@ -1,0 +1,35 @@
+import SUP_message
+import Fingerprinter
+
+#I guess we just craft a message and send that shit? idk lol lets do it
+
+#the protocol seems to send over the path of the file it wants first, then gets a blank ACK, sends a blank 1A command, then gets the contents
+#of the file in the second reply
+
+
+def get_file(file_path, ip):
+    pkt = SUP_message.sup_msg()
+
+    pkt.file_command(file_path)
+    reply = Fingerprinter.send_msg(pkt.create(), ip)
+    #send this after the ACK?
+    #7d:0d:ff:f0:c0:01:1a:06:00:04:9f:9f:80:1d:0f
+    #reply = Fingerprinter.send_msg("7d0dfff0c0011a0600049f9f801d0f", ip)
+    #So this didn't quite work. The packet that was sent back this time had some different stuff in it
+    #I think I need to make that different stuff match in the second packet I send over
+
+    code = check_value(reply)
+    reply = Fingerprinter.send_msg("7d0dfff0c0011a06" + code + "1d0f", ip)
+    #that comes back with the name of the file, I guess as a confirmation
+    
+    #what iotk sends now: 7d:12:ff:f0:c0:02:1a:01:04:9f:9f:80:00:00:00:00:00:3e:1d:0f
+    reply = Fingerprinter.send_msg("7d12fff0c0021a01" + code[2:] + "00000000003e1d0f", ip)
+
+    #The file data is in the reply, I just need to format it and shit. Also I need to figure out what to do with it (temp file?)
+
+    print("hi")
+
+def check_value(reply):
+    value = reply.data
+    value = value[-10:] #get the last 10 characters of the data field
+    return value

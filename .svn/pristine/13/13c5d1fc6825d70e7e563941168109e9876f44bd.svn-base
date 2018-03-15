@@ -1,0 +1,132 @@
+from __future__ import print_function
+import SUP_message
+import STX_Networking
+import common_lib
+import random, string
+
+#I guess we just craft a message and send that shit? idk lol lets do it
+
+#the protocol seems to send over the path of the file it wants first, then gets a blank ACK, sends a blank 1A command, then gets the contents
+#of the file in the second reply
+max_reply_size = 225
+
+def write_file(ip, file_path, file_contents):
+    """Write file_contents to file_path on the sixnet device specified by ip. This will overwrite an existing file"""
+
+    #first create a temp file to write to, then rename the temp file to the file you want to create/overwrite
+    #this makes the operation atomic so I can't erase some important config file and error out before I can write the new data to it
+    #the tmp file name is just the regular file name, extension and all, with some random characters added to the end
+    tmp_file_path = file_path + "".join(random.choice(string.letters) for i in xrange(10))
+
+    pkt = SUP_message.sup_msg()
+
+    pkt.file_command(tmp_file_path, "w", len(file_contents))
+    #this sends over the name a file to create? iotk sends over the file path but with a .TMP extension
+    reply = STX_Networking.send_msg(pkt.create(), ip)
+    #"7d:27:ff:f0:c0:0a:1a:03:03:00:00:00:2d:2f:65:74:63:2f:6d:65:68:64:69:2f:77:72:69:74:65:5f:74:65:73:74:2e:54:4d:50:00:1d:0f
+
+    #reply has some info I probably need to pull out and use in the next message - last 8 bytes of data field
+    #no file name is passed when actually writing data so I guess this is just making sure we are talking about the same file
+    check = reply.data[-8:]
+    
+    index = 0 #index indicating the place in the file to write to
+    while index < len(file_contents):
+        
+        #keep track of how much you are writing
+        if len(file_contents) - index > max_reply_size:
+            size_to_write = max_reply_size
+        else:
+            size_to_write = len(file_contents) - index
+
+        #write that stuff! I don't think the reply is neccesary but whatever there you go
+        pkt.write_data(file_contents[index:index+size_to_write], check, index)
+        reply = STX_Networking.send_msg(pkt.create(), ip)
+
+        index += size_to_write
+
+    #tmp file all done being created, rename it
+    rename_file(tmp_file_path, file_path, ip)
+
+def rename_file(old_path, new_path, ip):
+    """Renames a file on target sixnet device"""
+    """command 1a09 must be rename"""
+    pkt = SUP_message.sup_msg()
+    pkt.generic_msg()
+
+    pkt.command     = "1a"
+    #rename is FILEOP followed by a 0900
+    pkt.data        = "0900" + old_path.encode("hex") + "00" + new_path.encode("hex") +"00"
+    pkt.calc_length()
+
+    #send off the command
+    STX_Networking.send_msg(pkt.create(), ip)
+    return
+
+def get_file(ip, file_path, local_path = None):
+    """Gets the file specified by file_path from the sixnet device at the specified ip. Returns null if file does not exist.
+    If local_path is specified then remote file is copied to local file"""
+    pkt = SUP_message.sup_msg()
+
+    pkt.file_command(file_path, "r")
+    reply = STX_Networking.send_msg(pkt.create(), ip)
+
+    #I think if the first byte of the data field is 0x02 then the file does not exist
+    if reply.data[:2] == "02":
+        return None
+
+    #send this after the ACK?
+    #7d:0d:ff:f0:c0:01:1a:06:00:04:9f:9f:80:1d:0f
+    #reply = STX_Networking.send_msg("7d0dfff0c0011a0600049f9f801d0f", ip)
+    #So this didn't quite work. The packet that was sent back this time had some different stuff in it
+    #I think I need to make that different stuff match in the second packet I send over
+
+    code = check_value(reply)
+    #this comes back with the name of the file, I guess as a confirmation?
+    #AH-HA! This also returns the file size. String manipulate your way to freedom, little file size
+    reply = STX_Networking.send_msg("7d0dfff0c0011a06" + code + "1d0f", ip)
+    total_file_size = get_file_size(reply)
+    
+    #this is where the actual file gets pushed over.
+    file_str = ""
+   
+    #keep pulling data until there is no more data to pull!
+    while len(file_str) < total_file_size:
+
+        #see how much of the file is left to send over
+        if total_file_size - len(file_str) > max_reply_size:
+            size_to_request = max_reply_size
+        else:
+            size_to_request = total_file_size - len(file_str)
+
+        #ok so, tell it from where in the file to start reading and how many characters to read
+        start_index = common_lib.int_to_hex_string(len(file_str)).zfill(8)
+        characters_to_read = common_lib.int_to_hex_string(size_to_request)
+
+        reply = STX_Networking.send_msg("7d12fff0c0021a01" + code[2:] + start_index + "00" + characters_to_read + "1d0f", ip)
+
+        #The file data is in the reply, I just need to format it and shit.
+        #there are 22 bytes of unneeded stuff before the actual contents of the file, don't print that
+        file_str += reply.data[22:].decode("hex")
+        
+    if(local_path == None):
+        return file_str
+    else:
+        try:
+            log = open(local_path, "w")
+            print(file_str, file = log)
+            log.close
+        except IOError:
+            print("File operation failed")
+    
+
+#get the last 10 characters of the data field, this is needed for some reason
+def check_value(reply):
+    value = reply.data
+    value = value[-10:] 
+    return value
+
+#Returns the file size give a reply
+def get_file_size(reply):
+    size = reply.data[-20:]
+    size = size[:10]
+    return int(size,16)

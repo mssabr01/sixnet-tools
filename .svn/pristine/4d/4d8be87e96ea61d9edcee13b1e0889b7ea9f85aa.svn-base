@@ -1,0 +1,107 @@
+import socket, ipaddr
+import sys, getopt
+from SUP_message import sup_msg
+import time
+
+#Module to generate UDP packets to find SIXNET devices on a network
+
+timeout = 3 #timeout in seconds to wait for a reply
+SIXNET_port = 1594
+discovery_message = "7d1cf2f0c077d01e0100636174202f70726f632f636d646c696e65001d0f"
+info_message = "7d0cfff0c0000c80000000081d0f"
+read_some_input = "7d1cf0ffc0000180000000087fff7fff37ea6adc00000000000000001d0f"
+
+def find(address):
+    """Takes the address provided (either CIDR format network or host) and scans for sixnet devices"""
+
+    #Send out packets
+                          #internet         #UDP
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    NOP_scan(address, sock)
+
+def send_command(ip,command):
+    """Encodes a shell command, sends it to the given ip, and returns the response"""
+    pkt = sup_msg()
+    pkt.shell_command(command)
+    return send_msg(pkt.create(),ip)
+
+def send_msg(message, address = "255.255.255.255"):
+    """sends a UDP packet to the specified address on the sixnet port with message as it contents
+    returns a sup_message is one is received, -1 otherwise"""
+    
+    #                     internet        UDP
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    #           converts the message from ASCII representation of hex into actual real-life for-realsies hex
+    sock.sendto(message.decode("hex"), (address, SIXNET_port))
+
+    retdata = None
+
+    while(retdata == None):
+        try:
+            retdata, addr = sock.recvfrom(2048) #buffer is 1024
+        except:
+            socket.timeout
+            break
+    
+    if(retdata):
+        return sup_msg(retdata.encode("hex"))
+        
+    else:
+        return -1
+
+
+def NOP_scan(address, sock):
+    """Sends a NOP command to the host if a single one is specified or every host on the network"""
+
+    #if this there is a / then it is a network address
+    #ex: 192.168.1.0/24
+    if (address.find("/") == -1):
+        subnet = False
+        address = ipaddr.IPv4Address(address)
+    else:
+        subnet = True
+        address = ipaddr.IPv4Network(address)
+
+    #if it is an address then just send that address a NOP
+    if(not subnet):
+        print("Checking " + address.compressed + "  ...")
+        #sock.sendto(SUP_message.SUP_message.NOP, (address.compressed, SIXNET_port))
+        sock.sendto(info_message.decode("hex"), (address.compressed, SIXNET_port))
+
+        data = None
+        try:
+            data, addr = sock.recvfrom(1024) #buffer is 1024
+        except:
+            socket.timeout
+        
+        if(data):
+            sup_msg = sup_msg(data.encode("hex"))
+            print ("Reply type: " + sup_msg.command)
+            print("Reply data: "  + sup_msg.data)
+        else:
+            print("No response")
+    #otherwise send one to each address in the subnet
+    else:
+        for host in address.iterhosts():
+            #sock.sendto(SUP_message.SUP_message.NOP,(host.compressed, SIXNET_port))
+            sock.sendto(info_message.decode("hex"), (host.compressed, SIXNET_port))
+            
+            #also check for replies
+            data = None
+            try:
+                data, addr = sock.recvfrom(1024) #buffer is 1024
+            except:
+                socket.timeout
+
+            if(data):
+                print("device found at: " + host.compressed)
+                sup_msg = sup_msg(data.encode("hex"))
+                print ("Reply type: " + sup_msg.command)
+                print("Reply data: "  + sup_msg.data)
+
+if __name__ == "__main__":
+    find(sys.argv[1:])
+
+

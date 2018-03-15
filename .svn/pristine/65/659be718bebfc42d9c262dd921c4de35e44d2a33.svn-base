@@ -1,0 +1,28 @@
+#import antigravity
+#antigravity.webbrowser.Mozilla
+import Fingerprinter
+#import telnet
+import SUP_message
+
+#Modbus.do_stuff()
+
+#telnet.open_connection("192.168.1.51", 23, 5)
+#Fingerprinter.find("192.168.1.0/24")
+
+msg = SUP_message.sup_msg()
+msg.shell_command("ps -p $$")
+
+cmd = msg.create()
+
+#print ("data: " + cmd)
+reply = Fingerprinter.send_msg(cmd,"192.168.1.51")
+
+#reply.print_all()
+#print
+#print reply.data
+if(reply != -1):
+    print reply.data[4:].decode("hex")
+else:
+    print("No data!")
+
+raw_input()

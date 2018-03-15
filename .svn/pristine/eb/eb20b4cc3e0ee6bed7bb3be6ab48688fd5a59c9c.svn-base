@@ -1,0 +1,77 @@
+import socket, ipaddr
+import sys, getopt
+import SUP_message
+import time
+
+#Module to generate UDP packets to find SIXNET devices on a network
+
+timeout = 3 #timeout in seconds to wait for a reply
+SIXNET_port = 1594
+discovery_message = "7d0ff1f0c000d007ffffffff00045e1d0f"
+info_message = "7d0cfff0c0000c80000000081d0f"
+read_some_input = "7d1cf0ffc0000180000000087fff7fff37ea6adc00000000000000001d0f"
+
+def find(address):
+    """Takes the address provided (either CIDR format network or host) and scans for sixnet devices"""
+    
+    #message = info_message.decode("hex")
+
+    #print("request command: " + str(sm1.command))
+    #print("request data: " + sm1.data)
+
+    #print("reply command: " + str(sm2.command))
+    #print("reply data: " + sm2.data)
+
+    #Send out packets
+                          #internet         #UDP
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    port_scan(address, sock)
+
+def port_scan(address, sock):
+    """Sends a NOP command to the host if a single one is specified or every host on the network"""
+
+    #if this there is a / then it is a network address
+    #ex: 192.168.1.0/24
+    if (address.find("/") == -1):
+        subnet = False
+        address = ipaddr.IPv4Address(address)
+    else:
+        subnet = True
+        address = ipaddr.IPv4Network(address)
+
+    #if it is an address then just send that address a NOP
+    if(not subnet):
+        print("Checking " + address.compressed + "  ...")
+        sock.sendto(SUP_message.SUP_message.NOP, (address.compressed, SIXNET_port))
+
+        data = None
+        try:
+            data, addr = sock.recvfrom(1024) #buffer is 1024
+        except:
+            socket.timeout
+        
+        if(data):
+            print(data)
+        else:
+            print("No response")
+    #otherwise send one to each address in the subnet
+    else:
+        for host in address.iterhosts():
+            print("Checking " + host + "    ...")
+            sock.sendto(SUP_message.NOP,(host, SIXNET_port))
+            
+            #also check for replies
+            data = None
+            try:
+                data, addr = sock.recvfrom(1024) #buffer is 1024
+            except:
+                socket.timeout
+
+            if(data):
+                print(data)
+
+if __name__ == "__main__":
+    find(sys.argv[1:])
+
+

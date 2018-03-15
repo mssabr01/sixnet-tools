@@ -1,0 +1,178 @@
+import common_lib
+
+
+class sup_msg(object):
+    """SIXNET Universal Protocol message
+    #field order/size (bytes)
+    #   lead        1
+    #   length      1
+    #   dest        1 or 2
+    #   src         1 or 2
+    #   session     1
+    #   sequence    1
+    #   command     1
+    #   data        variable
+    #   crc         2"""
+    #TODO:
+
+    commands = {
+                0   :   "NOP",      1   :   "ACK",      2   :   "NAK",      3   :   "VERS",
+                4   :   "NIO",      10  :   "GETD",     11  :   "GETB",     12  :   "GETA",
+                13  :   "GETS",     14  :   "PUTD",     15  :   "PUTB",     16  :   "PUTA",
+                17  :   "SETD",     18  :   "CLRD",     24  :   "SCLOCK",   25  :   "GCLOCK",
+                26  :   "FILEOP",   32  :   "IOXCHG",   208 :   "Execute command"
+                }
+
+    def __init__(self, message = None):
+        if(not message is None):
+            #if there is a message in the constructor then build a sup_msg from it
+            self.message = message
+            self.breakdown(message)
+
+    def shell_command(self, shell_command):
+        #7d15fff0c0001a00012f6574632f706173737764001d0f
+        """Creates a sup message from a given command and data"""
+        
+        self.generic_msg()
+
+        self.command    = "d0"
+        self.data       = "1e0100" + shell_command.encode("hex") + "00"
+
+        self.calc_length()
+
+    def nop(self):
+        """Just a nop, should get an ACK reply"""
+        #Need to make this work better
+        self.generic_msg()
+
+        self.command    = "00"  #NOP
+        self.data       = ""
+        self.calc_length()
+
+    def file_command(self, file_path, r_w, file_size=None):
+        #7d:14:ff:f0:c0:00:1a:00:03:2f:65:74:63:2f:68:6f:73:74:73:00:1d:0f
+        """Creates a sup message to retrieve a file from the device. file_size is only required if writing to the device"""
+        self.generic_msg()
+
+        self.command    = "1a"  #another undocumented command
+        if r_w == "r":
+            self.data   = "0003" + file_path.encode("hex") + "00"
+        elif r_w == "w":
+            self.data   = "0303" + common_lib.int_to_hex_string(file_size).zfill(8) + file_path.encode("hex") + "00"
+        else:
+            raise ValueError('r_w is not an \'r\' or a \'w\'')
+
+        self.calc_length()
+
+    def query_inputs(self):
+        """Finds the types and quantities of IO on the device"""
+        #BAH DAMN PROBABLY NOT WHAT IM LOOKING FOR. spits out stuff that doesn't follow the documentation
+        self.generic_msg()
+        self.command    = "04"  #NIO
+        self.data       = "04"  #input
+
+        self.calc_length()
+
+    def gets(self):
+        #OK SERIOUSLY IS THIS SOME KIND OF CRUEL JOKE? WORK DAMN YOU!
+        self.generic_msg()
+        self.command    = "0d" #gets
+        self.data       = "000000" #input type from element 0
+
+        self.calc_length()
+
+    def get_digital(self, io = False, port_num = None):
+        """If io is true then creates a sup message to return the value on the digital inputs. Otherwise returns the value on the digital outputs"""
+        #Need to make this work better
+        self.generic_msg()
+
+        self.command    = "0a"  #GETD
+        if(io):
+            self.data   = "00"  #digital input
+        else:
+            self.data   = "01" #digital output
+        self.data      += "0000" #start pin
+        self.data      += "0400" #num of pins to check
+
+        self.calc_length()
+
+    def set_digital(self, pins = None, port_num = None):
+        """sets the spcified pins to some value"""
+        #Need to make this work better
+        self.generic_msg()
+
+        self.command    = "0e"  #PUTD
+        #if(io):
+        #    self.data   = "00"  #digital input
+        #else:
+        self.data       = "01" #digital output
+        self.data      += "0000" #start pin 
+        self.data      += "ff00" #num of pins to set
+        if(pins == None):
+            self.data  += "1f"   #set to all on I guess
+        else:
+            self.data  += common_lib.int_to_hex_string(pins)
+
+        self.calc_length()
+
+    def write_data(self, contents, check, start_index):
+        """Creates a sup message to retrieve a file from the device. file_size is only required if writing to the device"""
+        self.generic_msg()
+
+        self.command    = "1a"  #another undocumented command
+        self.data       = "02" + check +  common_lib.int_to_hex_string(start_index).zfill(8) + common_lib.int_to_hex_string(len(contents)).zfill(4)
+        self.data      += contents.encode("hex")
+       
+        self.calc_length()
+
+    def generic_msg(self):
+        """Creates a generic SUP message. Fill in the command and data yourself"""
+        self.lead       = "}".encode("hex")
+        self.dst        = "ff"
+        self.src        = "f0"
+        self.session    = "c0"
+        self.sequence   = "00"
+        self.crc        = "1d0f"
+
+    def calc_length(self):
+        """Calculates the length field for the message"""
+        self.length     = (len(self.dst) + len(self.src) + len(self.session) + len(self.sequence) + len(self.command) + len(self.data) + len(self.crc))/2
+
+    def create(self):
+        """Formats properties into a message to send over. Returns a string"""
+        msg_str = self.lead
+        #if the length is less than 16 then the hex value will be one character (0-f). This needs a leading zero so add it
+        if(self.length < 16):
+            msg_str += hex(self.length).replace("x","")
+        else:
+            msg_str += hex(self.length).replace("0x","")
+        msg_str += self.dst + self.src + self.session + self.sequence + self.command + self.data + self.crc
+        return msg_str
+
+    def breakdown(self, message):
+        """Breaks down the message to its component fields"""
+        self.lead       = message[0:2]
+        
+        self.length     = int(message[2:4],16) #convert the hex value stored as a string to an int
+        self.dst        = message[4:6]
+        self.src        = message[6:8]
+        self.session    = message[8:10]
+        self.sequence   = message[10:12]
+        self.command    = message[12:14] #self.commands.get(int(message[12:14],16), str.format("{0} (unrecognized)", message[12:14]))
+        self.data       = message[14:(len(message)-4)] #convert the hex value stored as a string to an int
+        self.crc        = message[-4:] #last 2 bytes
+
+    def print_all(self):
+        """Prints all the fields of the message"""
+        print("Lead: " + self.lead)
+        print("Length: " + str(self.length))
+        if(self.dst == "ff"):
+            print("Destination station: ANY")
+        else:
+            print("Destination station: " + self.dst)
+        print("Source Station: " + self.src)
+        print("Session: " + self.session)
+        print("Sequence: " + self.sequence)
+        print("Command: " + self.commands.get(int(self.command), str.format("{0} (unrecognized)", self.command)))
+        print("Data: " + self.data)
+        print("CRC: " + self.crc)

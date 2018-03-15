@@ -1,0 +1,21 @@
+import SUP_message
+import Fingerprinter
+import sys
+
+
+def sup_shell():
+    print("Sixnet Universal Protocol shell v0.1")
+    while(True):
+
+        msg = SUP_message.sup_msg()
+        msg.shell_command(raw_input('someone$ '))
+
+        cmd = msg.create()
+
+        #print ("data: " + cmd)
+        reply = Fingerprinter.send_msg(cmd,"192.168.1.51")
+
+        #reply.print_all()
+        #print
+        #print reply.data
+        print reply.data[4:].decode("hex")

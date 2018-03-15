@@ -1,0 +1,64 @@
+#import antigravity
+#antigravity.webbrowser.Mozilla
+import sys, getopt
+import STX_Networking
+import telnet
+import sup_shell
+import file_manip, attactions
+from SUP_message import sup_msg
+
+welcome  = "rev ??? Mehdi Sabraoui 2013\n"
+welcome += "   _   _   _   _   _   _  \n"
+welcome += "  / \ / \ / \ / \ / \ / \ \n"
+welcome += " ( S | I | X | N | E | T )\n"
+welcome += "  \_/ \_/ \_/ \_/ \_/ \_/ \n"
+welcome += "   _   _   _   _   _      \n"
+welcome += "  / \ / \ / \ / \ / \     \n"
+welcome += " ( T | o | o | l | s )    \n"
+welcome += "  \_/ \_/ \_/ \_/ \_/     \n"
+
+usage   = "Usage: SIXNET_tools [Options] {target specifications}"
+
+help     = "Sixnet Tools. Tools for poking at Sixnet things.\n"
+help    += "TARGET SPECIFICATION:\n"
+help    += "Can pass IP addresses or networks\n"
+help    += " Ex: 192.168.1.1, 10.1.1.0/24\n"
+help    += "Options:\n"
+help    += " -h                      Displays this help dialog\n"
+help    += " -s {host | network}     NOP scans a host or network for sixnet devices.\n"
+help    += " -T {host}               Enables telnet for the given ip address\n"
+help    += " -F {host}               Enables FTP for the given ip address\n"
+help    += " -f {host}               Gets OS and Firmware information for the given ip address\n"
+help    += " -S {host}               Opens a very dumb shell to the given ip address\n"
+help    += " -b {host}               furk bamp\n"
+
+def main(argv):
+        try:
+            opts, args = getopt.getopt(argv,"hs:T:F:f:S:b:",["scan=","enableTelnet=","enableFTP=","fingerprint=","shell=","forkbomb="])
+        except getopt.GetoptError:
+            print welcome
+            print usage
+            sys.exit(2)
+        for opt, arg in opts:
+            if opt == '-h':
+                print help
+                sys.exit()
+            elif opt in ("-s", "--scan"):           #scan
+                STX_Networking.NOP_scan(arg)
+            elif opt in ("-T", "--enableTelnet"):       #enable telnet
+                attactions.enable_telnet(arg)
+            elif opt in ("-F", "--enableFTP"):          #enable ftp
+                attactions.enable_ftp(arg)
+            elif opt in ("-f", "--fingerprint"):    #fingerprint
+                attactions.fingerprint(arg)
+            elif opt in ("-S", "--shell"):         #shell
+                attactions.sup_shell(arg)
+            elif opt in ("-b", "--forkbomb"):
+                attactions.forkbomb(arg)
+
+if __name__ == "__main__":
+        main(sys.argv[1:])
+
+
+
+

@@ -1,0 +1,21 @@
+import file_manip
+
+def enable_ftp(ip):
+    sixnet_config = "/etc/stacfg/general.config"
+    """Enables telnet on a sixnet device if it is not already enabled"""
+    config = file_manip.get_file(sixnet_config, ip)
+
+    #find telnet part and change it from 0 to 1
+    new_config = config.replace("enable ftp=0", "enable ftp=1")
+
+    file_manip.write_file(sixnet_config, new_config, ip)
+
+def enable_telnet(ip):
+    sixnet_config = "/etc/stacfg/general.config"
+    """Enables telnet on a sixnet device if it is not already enabled"""
+    config = file_manip.get_file(sixnet_config, ip)
+
+    #find telnet part and change it from 0 to 1
+    new_config = config.replace("enable telnet=0", "enable telnet=1")
+
+    file_manip.write_file(sixnet_config, new_config, ip)

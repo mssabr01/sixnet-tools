@@ -1,0 +1,21 @@
+#import antigravity
+#antigravity.webbrowser.Mozilla
+import Fingerprinter
+import telnet
+import sup_shell
+import file_manip, attactions
+
+ip = "192.168.1.51"
+
+contents = "ACHTUNG!\n"
+contents += "ALLES TURISTEN UND NONTEKNISCHEN LOOKENPEEPERS!\n"
+contents += "DAS KOMPUTERMASCHINE IST NICHT FUR DER GEFINGERPOKEN UND MITTENGRABEN! ODERWISE IST EASY TO SCHNAPPEN DER SPRINGENWERK, BLOWENFUSEN UND POPPENCORKEN MIT SPITZENSPARKSEN.\n"
+contents += "IST NICHT FUR GEWERKEN BEI DUMMKOPFEN. DER RUBBERNECKEN SIGHTSEEREN KEEPEN DAS COTTONPICKEN HANDER IN DAS POCKETS MUSS.\n"
+contents += "ZO RELAXEN UND WATSCHEN DER BLINKENLICHTEN.\n"
+
+attactions.enable_telnet(ip)
+raw_input()
+
+
+
+

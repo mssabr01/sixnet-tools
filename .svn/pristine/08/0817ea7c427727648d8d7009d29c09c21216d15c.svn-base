@@ -1,0 +1,12 @@
+#import antigravity
+#antigravity.webbrowser.Mozilla
+import Fingerprinter
+import telnet
+import Modbus
+
+#Modbus.do_stuff()
+
+#telnet.open_connection("192.168.56.102", 23, 3)
+Fingerprinter.find("192.168.1.0/24")
+
+raw_input()

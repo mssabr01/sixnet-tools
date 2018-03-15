@@ -1,0 +1,87 @@
+class sup_msg(object):
+    """SIXNET Universal Protocol message
+    #field order/size (bytes)
+    #   lead        1
+    #   length      1
+    #   dest        1 or 2
+    #   src         1 or 2
+    #   session     1
+    #   sequence    1
+    #   command     1
+    #   data        variable
+    #   crc         2"""
+    #TODO:
+
+
+    commands = {
+                0   :   "NOP",      1   :   "ACK",      2   :   "NAK",      3   :   "VERS",
+                4   :   "NIO",      10  :   "GETD",     11  :   "GETB",     12  :   "GETA",
+                13  :   "GETS",     14  :   "PUTD",     15  :   "PUTB",     16  :   "PUTA",
+                17  :   "SETD",     18  :   "CLRD",     24  :   "SCLOCK",   25  :   "GCLOCK",
+                32  :   "IOXCHG",   208 :   "Execute command"
+                }
+
+    #message for a NOP command
+    #NOP = "7d0009603f603f001500000f".decode("hex")
+    NOP = "7d07fff0c00000d70f".decode("hex")
+          #"7d0cfff0c0000c80000000081d0f"
+    #turn_shit_on = "7d0dffff00050e01000008000011d0f".decode("hex")
+    #NOP = '}\x07\xff\xff\x00\x05\x00\xd7\x0f'
+
+    def __init__(self, message = None):
+        if(not message is None):
+            #if there is a message in the constructor then build a sup_msg from it
+            self.message = message
+            self.breakdown(message)
+
+    def shell_command(self, shell_command):
+        #7d15fff0c0001a00012f6574632f706173737764001d0f
+        """Creates a sup message from a given command and data"""
+        self.lead       = "}".encode("hex")
+        self.dst        = "ff"
+        self.src        = "f0"
+        self.session    = "c0"
+        self.sequence   = "00"
+        self.command    = "d0"
+        self.data       = "1e0100" + shell_command.encode("hex") + "00"
+        self.crc        = "1d0f"
+        self.length     = (len(self.dst) + len(self.src) + len(self.session) + len(self.sequence) + len(self.command) + len(self.data) + len(self.crc))/2
+
+    def create(self):
+        """formats properties into a message to send over"""
+        msg_str = self.lead
+        #if the length is less than 16 then the hex value will be one character (0-f). This needs a leading zero so add it
+        if(self.length < 16):
+            msg_str += hex(self.length).replace("x","")
+        else:
+            msg_str += hex(self.length).replace("0x","")
+        msg_str += self.dst + self.src + self.session + self.sequence + self.command + self.data + self.crc
+        return msg_str
+
+    def breakdown(self, message):
+        """Breaks down the message to its component fields"""
+        self.lead       = message[0:2]
+        
+        self.length     = int(message[2:4],16) #convert the hex value stored as a string to an int
+        self.dst        = message[4:6]
+        self.src        = message[6:8]
+        self.session    = message[8:10]
+        self.sequence   = message[10:12]
+        self.command    = message[12:14] #self.commands.get(int(message[12:14],16), str.format("{0} (unrecognized)", message[12:14]))
+        self.data       = message[14:(len(message)-4)] #convert the hex value stored as a string to an int
+        self.crc        = message[-4:] #last 2 bytes
+
+    def print_all(self):
+        """Prints all the fields of the message"""
+        print("Lead: " + self.lead)
+        print("Length: " + str(self.length))
+        if(self.dst == "ff"):
+            print("Destination station: ANY")
+        else:
+            print("Destination station: " + self.dst)
+        print("Source Station: " + self.src)
+        print("Session: " + self.session)
+        print("Sequence: " + self.sequence)
+        print("Command: " + self.commands.get(int(self.command), str.format("{0} (unrecognized)", self.command)))
+        print("Data: " + self.data)
+        print("CRC: " + self.crc)

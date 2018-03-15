@@ -1,0 +1,14 @@
+import SUP_message
+import STX_Networking
+import sys
+
+
+def sup_shell(ip):
+    """A very dumb CLI for interfacing with the sixnet device at the designated ip"""
+    print("Sixnet Universal Protocol shell v0.1")
+    while(True):
+        #read in the shell command from the user and send that shit off
+        reply = STX_Networking.send_command(ip, raw_input('someone$ '))
+
+        #Decode the reply and print it
+        print reply.data[4:].decode("hex")

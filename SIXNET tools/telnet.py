@@ -1,0 +1,89 @@
+import telnetlib, socket
+import subprocess, sys
+from optparse import OptionParser
+
+def main():
+    parser = OptionParser()
+    parser.add_option("-p", "--port",
+        help="The port to connect to",
+        dest="port", default=23)
+    parser.add_option("-d", "--device",
+        help="The device to poke at",
+        dest="host", default="127.0.0.1")
+    parser.add_option("-t", "--timeout",
+        help="timeout for connection attempts",
+        dest="range", default=5)
+    (opt, arg) = parser.parse_args()
+
+    open_connection(opt.host, opt.port, opt.timeout)
+
+def open_connection(host, port, timeout):
+    """Tries a set of default/simple usernames and passwords to telnet into the remote host
+    If successful the credentials are displayed and a new console is spawned for telnet action"""
+
+    user = ["user", "root"]
+    password = ["password", "1234", ""]
+    expect = ["Last login.*", "login: ", "# "]
+    
+    correct_password = None
+    correct_username = None
+
+    tn = telnetlib.Telnet(host, port, timeout)
+    success = False
+    tn.read_until("login: ", 5)
+
+    #while we have not run out of username and password combinations keep trying
+    for name in user:
+        for pwd in password:
+            
+            tn.write(name + "\n")
+           
+            #After so many failed attempts the remote server may terminate the connection
+            #reopen it
+            try:
+                tn.read_until("Password:")
+            except EOFError:
+                print("Closed, reopening")
+                tn = telnetlib.Telnet(host, port, timeout)
+                tn.read_until("login: ")
+                tn.write(name + "\n")
+                tn.read_until("Password:")
+
+            
+            tn.write(pwd + "\n")
+
+            #look for another password prompt, a terminal, or a connection ended
+            try:
+                output = tn.expect(expect,timeout)
+                
+            except socket.timeout as EOFError:
+                print("Closed, reopening")
+                tn = telnetlib.Telnet(host, port, timeout)
+                tn.read_until("login: ")
+                tn.write(name + "\n")
+                tn.read_until("Password:")
+
+            #if nothing in the expect array matches then we probably succeeded
+            if(output[0] == 0):
+                print("success?")
+                success = True
+                correct_password = pwd
+                correct_username = name
+                break
+            else:
+                print(name + ", " + pwd + " not right")
+        if(success):
+            break
+
+    #if successful open a native telnet client
+    if(success):
+        print("username: " + correct_username)
+        print("password: " + correct_password)
+        #nasty, but as far as I can tell required to start the native telnet client in its own console
+        #the interact() telnet terminal is too dumb to use
+        subprocess.Popen(["telnet", host],0,None,None,None,None,None,False,False,None,None,False,None,subprocess.CREATE_NEW_CONSOLE)
+    else:
+        print("No luck guessing password")
+
+if __name__ == "__main__":
+    main()

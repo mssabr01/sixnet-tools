@@ -1,0 +1,64 @@
+import SUP_message
+import Fingerprinter
+import common_lib
+
+#I guess we just craft a message and send that shit? idk lol lets do it
+
+#the protocol seems to send over the path of the file it wants first, then gets a blank ACK, sends a blank 1A command, then gets the contents
+#of the file in the second reply
+max_reply_size = 225
+
+
+def get_file(file_path, ip):
+    pkt = SUP_message.sup_msg()
+
+    pkt.file_command(file_path)
+    reply = Fingerprinter.send_msg(pkt.create(), ip)
+    #send this after the ACK?
+    #7d:0d:ff:f0:c0:01:1a:06:00:04:9f:9f:80:1d:0f
+    #reply = Fingerprinter.send_msg("7d0dfff0c0011a0600049f9f801d0f", ip)
+    #So this didn't quite work. The packet that was sent back this time had some different stuff in it
+    #I think I need to make that different stuff match in the second packet I send over
+
+    code = check_value(reply)
+    #this comes back with the name of the file, I guess as a confirmation?
+    #AH-HA! This also returns the file size. String manipulate your way to freedom, little file size
+    reply = Fingerprinter.send_msg("7d0dfff0c0011a06" + code + "1d0f", ip)
+    total_file_size = get_file_size(reply)
+    
+    #this is where the actual file gets pushed over.
+    file_str = ""
+   
+    #keep pulling data until there is no more data to pull!
+    while len(file_str) < total_file_size:
+
+        #see how much of the file is left to send over
+        if total_file_size - len(file_str) > max_reply_size:
+            size_to_request = max_reply_size
+        else:
+            size_to_request = total_file_size - len(file_str)
+
+        #ok so, tell it from where in the file to start reading and how many characters to read
+        start_index = common_lib.int_to_hex_string(len(file_str)).zfill(8)
+        characters_to_read = common_lib.int_to_hex_string(size_to_request)
+
+        reply = Fingerprinter.send_msg("7d12fff0c0021a01" + code[2:] + start_index + "00" + characters_to_read + "1d0f", ip)
+
+        #The file data is in the reply, I just need to format it and shit.
+        #there are 22 bytes of unneeded stuff before the actual contents of the file, don't print that
+        file_str += reply.data[22:].decode("hex")
+        
+    
+    return file_str
+
+#get the last 10 characters of the data field, this is needed for some reason
+def check_value(reply):
+    value = reply.data
+    value = value[-10:] 
+    return value
+
+#Returns the file size give a reply
+def get_file_size(reply):
+    size = reply.data[-20:]
+    size = size[:10]
+    return int(size,16)

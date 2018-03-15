@@ -1,0 +1,48 @@
+import file_manip
+from SUP_message import sup_msg
+import STX_Networking
+
+def enable_ftp(ip):
+    sixnet_config = "/etc/stacfg/general.config"
+    """Enables telnet on a sixnet device if it is not already enabled"""
+    print("enabling ftp...")
+    config = file_manip.get_file(sixnet_config, ip)
+
+    #find telnet part and change it from 0 to 1
+    new_config = config.replace("enable ftp=0", "enable ftp=1")
+
+    file_manip.write_file(sixnet_config, new_config, ip)
+    print("Success!")
+
+def enable_telnet(ip):
+    sixnet_config = "/etc/stacfg/general.config"
+    """Enables telnet on a sixnet device if it is not already enabled"""
+    print("enabling telnet...")
+    config = file_manip.get_file(sixnet_config, ip)
+
+    #find telnet part and change it from 0 to 1
+    new_config = config.replace("enable telnet=0", "enable telnet=1")
+
+    file_manip.write_file(sixnet_config, new_config, ip)
+    print("Success!")
+
+def fingerprint(address):
+    """Gets the Sixnet firmware version, IO map, and OS version"""
+    file = "/etc/sxbuildinfo.txt"
+    build_info = file_manip.get_file(file, address)
+
+    #format the build info to remove unnecessary data
+    build_info = build_info.split("\t")
+    build_info = build_info[0] + " " +  build_info[1]
+
+    #TODO: Find analog/digital inputs/outputs
+    #I think the only way to do it is to query each one and see if I get a response or an error or something
+    #After much fiddling this thing will let you read from or write to 8192 input and output registers with out telling you that
+    #only 4 of those are actually being used. 
+
+    #just send a uname command over
+    os_ver = STX_Networking.send_command(address,"uname -sr").data[4:].decode("hex")
+
+    print("Firmware:\t" + build_info)
+    print("OS: \t\t" + os_ver)
+    
