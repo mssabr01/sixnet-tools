@@ -8,7 +8,7 @@ def enable_ftp(ip):
     print("enabling ftp...")
     config = file_manip.get_file(ip, sixnet_config)
 
-    #find telnet part and change it from 0 to 1
+    #find telnet part and change it from 0 to 1.
     new_config = config.replace("enable ftp=0", "enable ftp=1")
 
     file_manip.write_file(sixnet_config, new_config, ip)
